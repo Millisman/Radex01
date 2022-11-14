@@ -2,9 +2,9 @@ include Makefile.inc
 
 # Add other libraries here like SPI , I2C or LiquidCrystal
 
-LIBS = Arduino
+LIBS = AppRadio AppSensor AppUI Arduino
 
-CXXFLAGS = $(PRJCXXFLAGS) -I. -I./Arduino
+CXXFLAGS = $(PRJCXXFLAGS) -I. -IArduino -IAppRadio -IAppUI -IAppSensor
 
 
 SRCDIR = .

@@ -5,8 +5,13 @@ PORT 		= -P /dev/ttyUSB0
 UPLOAD_PROTOCOL = arduino
 # UPLOAD_PROTOCOL = usbtiny
 BUILD_MCU 	= atmega328p
-UPLOAD_SPEED 	= 38400
+# UPLOAD_SPEED 	= 38400
+# BUILD_F_CPU 	= 8000000L
+
+# №срштф
+UPLOAD_SPEED 	= 57600
 BUILD_F_CPU 	= 8000000L
+
 
 # The compiler and build tools for ATMEGA-AVR must be installed on your system,
 # or you must download it to a separate directory and write all the paths manually.

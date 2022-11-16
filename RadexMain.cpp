@@ -6,7 +6,9 @@
 RF24 radio(PIN_A0, 10); //cepin, cspin
 
 #include "AppUI/LiquidCrystal.h"
+// rs, enable, d d d d
 LiquidCrystal lcd(3, 4, 5, 6, 7, 8);
+
 
 #include "AppSensor/Wire.h"
 #include "AppSensor/AHTxx.h"
@@ -69,7 +71,7 @@ void setup(void) {
     lcd.begin(20, 4);
     lcd.print("hello, world!");
     
-    pinMode(interruptPin, INPUT_PULLUP);
+    pinMode(interruptPin, INPUT);
     // Lege die ISR 'blink' auf den Interruptpin mit Modus 'CHANGE':
     // "Bei wechselnder Flanke auf dem Interruptpin" --> "Führe die ISR aus"
     attachInterrupt(digitalPinToInterrupt(interruptPin), blink, FALLING);
@@ -91,18 +93,18 @@ void setup(void) {
     
     //delay(1000);
     // Print out header, high then low digit
-    int i = 0;
-    while (i < num_channels) {
-        Serial.print(i >> 4, HEX);
-        ++i;
-    }
-    Serial.println();
-    i = 0;
-    while (i < num_channels) {
-        Serial.print(i & 0xf, HEX);
-        ++i;
-    }
-    Serial.println();
+//     int i = 0;
+//     while (i < num_channels) {
+//         Serial.print(i >> 4, HEX);
+//         ++i;
+//     }
+//     Serial.println();
+//     i = 0;
+//     while (i < num_channels) {
+//         Serial.print(i & 0xf, HEX);
+//         ++i;
+//     }
+//     Serial.println();
     //delay(1000);
     
     
@@ -114,17 +116,20 @@ void setup(void) {
     
     
     
-    while (aht10.begin() != true) //for ESP-01 use aht10.begin(0, 2);
+    while (aht10.begin() != true)
     {
         Serial.println(F("AHT1x not connected or fail to load calibration coefficient")); //(F()) save string to flash & keeps dynamic memory free
         
         delay(1000);
-        Serial.println(protons);
+        
         
     }
-    
+//     
     Serial.println(F("AHT10 OK"));
     
+    
+    pinMode(PIN_A1, OUTPUT);
+    digitalWrite(PIN_A1, HIGH);
 }
 
 //
@@ -134,10 +139,77 @@ void setup(void) {
 const int num_reps = 100;
 bool constCarrierMode = 0;
 
+// int period = 1000;
+uint32_t time_now = 0;
+uint16_t amin = 1023;
+uint16_t amax = 0;
+int aval;
+uint16_t samples = 0;
 void loop(void) {
-    lcd.setCursor(0, 1);
-    // print the number of seconds since reset:
-    lcd.print(millis() / 1000);
+    
+    if((millis() - time_now) > 1000){
+        time_now = millis();
+
+        Serial.print(F("HV ADC min: "));
+        Serial.print(amin);
+        Serial.print(F(" max "));
+        Serial.print(amax);
+        Serial.print(F(" samples "));
+        Serial.println(samples);
+        lcd.setCursor(0, 1);
+        lcd.print(F("HV min "));
+        lcd.print(amin);
+        lcd.print(F(" max "));
+        lcd.print(amax);
+        lcd.setCursor(0, 2);
+        lcd.print(F(" samples "));
+        lcd.print(millis());
+        amin = 1023;
+        amax = 0;
+        samples =0;
+        
+        int quality = sensor.slope();
+        
+        Serial.print("Sensor value: ");
+        Serial.println(sensor.getValue());
+        
+        if (quality == AirQualitySensor::FORCE_SIGNAL) {
+            Serial.println("High pollution! Force signal active.");
+        } else if (quality == AirQualitySensor::HIGH_POLLUTION) {
+            Serial.println("High pollution!");
+        } else if (quality == AirQualitySensor::LOW_POLLUTION) {
+            Serial.println("Low pollution!");
+        } else if (quality == AirQualitySensor::FRESH_AIR) {
+            Serial.println("Fresh air.");
+        }
+        
+    }
+
+    aval = analogRead(PIN_A6);
+    if (aval > amax) amax = aval;
+    if (aval < amin) amin = aval;
+    ++samples;
+        lcd.setCursor(0, 3);
+//     Serial.print(F("Protons: "));
+//     Serial.println(protons);
+    
+    
+    
+
+    
+    
+    
+    
+    
+    
+    
+    
+//     lcd.setCursor(0, 1);
+//     print the number of seconds since reset:
+//     lcd.print(millis() / 1000);
+//     lcd.setCursor(0, 2);
+//     lcd.print(protons);
+    return;
     
     /****************************************/
     // Send g over Serial to begin CCW output
@@ -159,20 +231,7 @@ void loop(void) {
     /****************************************/
     
     
-    int quality = sensor.slope();
-    
-    Serial.print("Sensor value: ");
-    Serial.println(sensor.getValue());
-    
-    if (quality == AirQualitySensor::FORCE_SIGNAL) {
-        Serial.println("High pollution! Force signal active.");
-    } else if (quality == AirQualitySensor::HIGH_POLLUTION) {
-        Serial.println("High pollution!");
-    } else if (quality == AirQualitySensor::LOW_POLLUTION) {
-        Serial.println("Low pollution!");
-    } else if (quality == AirQualitySensor::FRESH_AIR) {
-        Serial.println("Fresh air.");
-    }
+
     
     
     
@@ -214,7 +273,7 @@ void loop(void) {
     
     delay(2000); //measurement with high frequency leads to heating of the sensor, see NOTE
     
-    /* DEMO - 2, temperature call will read 6-bytes via I2C, humidity will use same 6-bytes */
+    // DEMO - 2, temperature call will read 6-bytes via I2C, humidity will use same 6-bytes/
     Serial.println();
     Serial.println(F("DEMO 2: read 6-byte"));
     
@@ -246,17 +305,16 @@ void loop(void) {
         printStatus(); //print temperature command status not humidity!!! RH measurement use same 6-bytes from T measurement
     }
     
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+    Serial.print(F("HV ADC 6: "));
+    Serial.println(analogRead(PIN_A6));
+    Serial.print(F("Protons: "));
+    Serial.println(protons);
+
+//     Vref = 4550mV
+//     ADC = 301 (0..1023)
+
+//     HVDC = 393V
+
     
     
     

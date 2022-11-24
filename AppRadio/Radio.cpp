@@ -1,83 +1,71 @@
+#pragma GCC diagnostic ignored "-Wunknown-attributes"
+
 #include "Arduino/Arduino.h"
 #include "Arduino/HardwareSerial.h"
 #include "RF24.h"
-#include "printf.h"
 #include "Radio.h"
 
 RF24 radio(PIN_A0, 10); //cepin, cspin
-bool constCarrierMode = 0;
-const uint8_t num_channels = 126;
-uint8_t values[num_channels];
-const int num_reps = 100;
+
+uint8_t address[][6] = {"xMain", "xRemo"};
+
+Radio_Packet_Type pkt;
+
+uint32_t fake_serial = 1;
+
+void do_packet(Radio_Packet_Type *p) { // TODO fake data
+    Serial.println(F("do_packet"));
+    p->DevSerNum = ++fake_serial;
+    p->Batt_mV = 4200;
+    p->Batt_mA = -100;
+    p->Solar_mV = 2000;
+    p-> Solar_mA = 0;
+    p-> Period_AirQ_s = 500;
+    p-> Period_GM_s = 1000;
+    p-> Duty_GM_s = 240;
+    p-> Period_Temp_s = 120;
+    p-> Period_Hum_s = 240;
+    p-> Err_Power = 0;
+    p-> Err_HVDC = 1;
+    p-> Err_Geiger = 1;
+    p-> Err_AirSense= 0;
+    p-> Err_TempSense= 0;
+    p-> Err_Humidity= 0;
+    p-> Err_XReady= 0;
+    p->Sen_GM_Cnt_Min=0;
+    p->Sen_Air_Q = 2;
+    p->Sen_Temp = 18.0f;
+    p->Sen_Humidity = 60.0f;
+    p->Sen_GM_Zivert = 0.13f;
+}
+
 
 void setup_radio() {
-    printf_begin();
-    radio.begin();
-    radio.setAutoAck(false);
-    
-    // Get into standby mode
-    radio.startListening();
-    radio.stopListening();
-    radio.printDetails();
+    memset(&pkt, 0, sizeof(pkt));
+    if (!radio.begin()) {
+        Serial.println(F("RF24 is not responding!!"));
+        pkt.Err_XReady = 1;
+    } else {
+        radio.setPALevel(RF24_PA_LOW);
+        radio.setChannel(5);
+        radio.setPayloadSize(sizeof(Radio_Packet_Type)); // default value is the maximum 32 bytes
+        radio.openWritingPipe(address[1]);      // set the TX address of the RX node into the TX pipe always uses pipe 0
+        radio.openReadingPipe(1, address[0]);   // using pipe 1
+        radio.stopListening(); // put radio in TX mode
+        // radio.startListening();   // put radio in RX mode
+        // For debugging info
+        radio.printDetails();
+        do_packet(&pkt);
+        pkt.Err_XReady = 0;
+    }
 }
 
 void do_radio() {
-    /****************************************/
-    // Send g over Serial to begin CCW output
-    // Configure the channel and power level below
-//     if (Serial.available()) {
-//         char c = Serial.read();
-//         if (c == 'g') {
-//             constCarrierMode = 1;
-//             radio.stopListening();
-//             delay(2);
-//             Serial.println("Starting Carrier Out");
-//             radio.startConstCarrier(RF24_PA_LOW, 40);
-//         } else if (c == 'e') {
-//             constCarrierMode = 0;
-//             radio.stopConstCarrier();
-//             Serial.println("Stopping Carrier Out");
-//         }
-//     }
-    /****************************************/
-    
-    if (constCarrierMode == 0) {
-        // Clear measurement values
-        memset(values, 0, sizeof(values));
-        
-        // Scan all channels num_reps times
-        int rep_counter = num_reps;
-        while (rep_counter--) {
-            int i = num_channels;
-            while (i--) {
-                // Select this channel
-                radio.setChannel(i);
-                
-                // Listen for a little
-                radio.startListening();
-                delayMicroseconds(128);
-                radio.stopListening();
-                
-                // Did we get a carrier?
-                if (radio.testCarrier()) {
-                    ++values[i];
-                }
-            }
+    if (pkt.Err_XReady == 0) {
+        do_packet(&pkt);
+        if (!radio.writeFast(&pkt, sizeof(Radio_Packet_Type))) {
+            Serial.println(F("writeFast fail!!"));
+            radio.reUseTX();
         }
-        
-        
-        // Print out channel measurements, clamped to a single hex digit
-        int i = 0;
-        while (i < num_channels) {
-            if (values[i])
-                Serial.print(min(0xf, values[i]), HEX);
-            else
-                Serial.print(F("-"));
-            
-            ++i;
-        }
-        Serial.println();
-        
-    }  //If constCarrierMode == 0
-    
+    }
 }

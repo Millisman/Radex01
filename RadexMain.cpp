@@ -3,14 +3,16 @@
 #include "AppSensor/Sensor.h"
 #include "AppUI/LiquidCrystal.h"
 #include "AppUI/UI.h"
+#include "AppRadio/printf.h"
 
 
 
 void setup(void) {
     Serial.begin(115200);
+    printf_begin();
     Serial.println(F("\n\rRadex"));
-    setup_UI();
     //-----------------
+    setup_UI();
     setup_radio();
     setup_sensors();
     //-----------------
@@ -19,7 +21,6 @@ void setup(void) {
 }
 
 void loop(void) {
-    do_UI();
     do_radio();
     do_sensors();
     // do sleep

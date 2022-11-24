@@ -49,9 +49,12 @@ $(OBJDIR)/%.o: %.cpp
 	@mkdir -p $(dir $@)
 	@echo [CPP] $(notdir $<)
 	@$(CXX) -c $(CXXFLAGS) $< -o $@
-
-$(OBJDIR)/%.a:
+	
+$(OBJDIR)/%.a: force_look
 	@cd $(patsubst lib%, %, $(basename $(notdir $@)) ; $(MAKE) $(MFLAGS))
+
+force_look:
+	@true
 
 $(OBJDIR)/$(ELF): $(LIBA) $(OBJS)
 	@echo [LINK] $(notdir $@)

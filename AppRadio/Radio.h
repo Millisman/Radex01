@@ -32,7 +32,9 @@ typedef union __attribute__ ((packed)) {
     uint8_t body[32];
 } Radio_Packet_Type;
 
-
+typedef struct __attribute__ ((packed)) {
+    uint32_t DevSerNum;
+} Serial_Num_Struct;
 
 
 #endif // __RADIO_H__

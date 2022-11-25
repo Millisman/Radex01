@@ -51,7 +51,7 @@ PRJCXXFLAGS += -fno-exceptions
 # PRJCXXFLAGS += -g
 
 # for floating-point printf
-# LDFLAGS = -Wl,-u,vfprintf -lprintf_flt -lm
+LDFLAGS = -Wl,-u,vfprintf -lprintf_flt -lm
 
 # for smaller printf
 # LDFLAGS = -Wl,-u,vfprintf -lprintf_min

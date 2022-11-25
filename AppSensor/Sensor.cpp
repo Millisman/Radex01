@@ -16,15 +16,19 @@ AHTxx aht10(AHTXX_ADDRESS_X38, AHT1x_SENSOR); //sensor address, sensor type
 
 #define INTERRUPTPIN 2
 
-static uint32_t protons = 0;
+uint32_t protons = 0;
+uint16_t protons_on_min = 0;
 void proton_inc() { ++protons; }
+
+uint16_t batt_vcc;
 
 void setup_sensors() {
     pinMode(INTERRUPTPIN, INPUT);
     attachInterrupt(digitalPinToInterrupt(INTERRUPTPIN), proton_inc, FALLING);
     pinMode(HEATER, OUTPUT);
     digitalWrite(HEATER, LOW);
-
+    batt_vcc = ReadVcc();
+    
     uint8_t tryes = 5;
     while (aht10.begin() != true) {
         Serial.println(F("AHT1x init FAIL!"));
@@ -37,19 +41,70 @@ void setup_sensors() {
 #define AHT10_INTERVAL       4000
 #define AIR_SENSOR_INTERVAL  600000
 
-static float ahtValue;
-static float ahtTemperature = -99.0;
-static float ahtHumidity = 0;
-static uint32_t time_aht10 = 0;
-static uint8_t ath_state = 0;
-static uint8_t ath_errors = 0;
+float ahtValue;
+float ahtTemperature = -99.0;
+float ahtHumidity = 0;
+uint32_t time_aht10 = 0;
+uint8_t ath_state = 0;
+uint8_t ath_errors = 0;
 
-static AirQualitySensor_state aqss = UNK;
-static uint32_t time_airsens = 0;
-static bool     init_airsens = false;
+AirQualitySensor_state aqss = UNK;
+uint32_t time_airsens = 0;
+bool     init_airsens = false;
 
+uint32_t time_60sec = 0;
+uint32_t protons_old_60s = 0;
+
+
+uint32_t time_1sec = 0;
+
+uint8_t MP503_air = 0; // FORCE_SIGNAL
+
+uint16_t amin = 1023;
+uint16_t amax = 0;
+int aval;
+uint16_t samples = 0;
+
+uint16_t GM_TUBE_HV = 0;
 
 void do_sensors() {
+    
+    aval = analogRead(PIN_A6);
+    if (aval > amax) amax = aval;
+    if (aval < amin) amin = aval;
+    ++samples;
+    
+
+    if((millis() - time_1sec) > 1000) { // sec
+        time_1sec = millis();
+        batt_vcc = ReadVcc();
+        
+//         uint16_t Adc_HV = analogRead(PIN_A6);
+        
+         //(Adc_HV/1024)
+        Serial.print(F("batt_vcc...: "));
+        Serial.println(batt_vcc);
+        
+        uint16_t avg_v = (amax + amin) / 2;
+
+        uint16_t Mv_HV_ADC = ((uint32_t)avg_v * (uint32_t)batt_vcc) / (1024 * 22 ); // (22 = 220K)
+        GM_TUBE_HV = ((uint32_t)5022 * (uint32_t)Mv_HV_ADC) / 1000; // 5022 = 50M + 220K
+        Serial.print(F("GM_TUBE_HV...: "));
+        Serial.println(GM_TUBE_HV);
+        
+        
+        
+        amin = 1023;
+        amax = 0;
+        samples = 0;
+        
+    }
+
+    if((millis() - time_60sec) > 60000) { // min
+        time_60sec = millis();
+        protons_on_min = protons - protons_old_60s;
+        protons_old_60s = protons;
+    }
 
     if((millis() - time_aht10) > AHT10_INTERVAL) {
         time_aht10 = millis();
@@ -141,6 +196,7 @@ void do_sensors() {
 
         case MEASURE:
             int quality = AirSensor.slope();
+            if (quality != -1) { MP503_air = quality; }
             Serial.print(F("Sensor value: "));
             Serial.println(AirSensor.getValue());
             if (quality == AirQualitySensor::FORCE_SIGNAL) {
@@ -181,4 +237,20 @@ void aht10_printStatus() {
             Serial.println(F("unknown status"));
             break;
     }
+}
+
+
+uint16_t ReadVcc() {
+    // analogReference(INTERNAL); // INTERNAL or EXTERNAL
+    ADMUX = _BV(REFS0) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1); // Read 1.1V reference against AVcc
+    _delay_us(500);
+    uint8_t old = ADCSRA;
+    ADCSRA = _BV(ADEN) | _BV(ADPS2) | _BV(ADSC);
+//     _delay_us(10);
+    while (bit_is_set(ADCSRA,ADSC));
+    uint16_t mV = ADCL;
+    mV |= ADCH<<8;
+    mV = 1126400L / mV; // 1100 * 1024
+    ADCSRA = old;
+    return mV;
 }

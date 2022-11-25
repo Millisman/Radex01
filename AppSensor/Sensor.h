@@ -5,7 +5,7 @@ void setup_sensors();
 void do_sensors();
 
 void aht10_printStatus();
-
+uint16_t ReadVcc();
 
 typedef enum {
     UNK = 0,

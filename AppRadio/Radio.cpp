@@ -4,6 +4,8 @@
 #include "Arduino/HardwareSerial.h"
 #include "RF24.h"
 #include "Radio.h"
+#include "AppRadio/Radio.h"
+// struct Serial_Num_Struct;
 
 RF24 radio(PIN_A0, 10); //cepin, cspin
 
@@ -13,12 +15,16 @@ Radio_Packet_Type pkt;
 
 uint32_t fake_serial = 1;
 
+
+
 void do_packet(Radio_Packet_Type *p) { // TODO fake data
-    Serial.println(F("do_packet"));
-    p->DevSerNum = ++fake_serial;
-    p->Batt_mV = 4200;
-    p->Batt_mA = -100;
-    p->Solar_mV = 2000;
+
+    extern Serial_Num_Struct sn_my; 
+    p->DevSerNum = sn_my.DevSerNum;
+    extern uint16_t batt_vcc;
+    p->Batt_mV = batt_vcc;
+    p->Batt_mA = 0;
+    p->Solar_mV = 0;
     p-> Solar_mA = 0;
     p-> Period_AirQ_s = 500;
     p-> Period_GM_s = 1000;
@@ -32,15 +38,30 @@ void do_packet(Radio_Packet_Type *p) { // TODO fake data
     p-> Err_TempSense= 0;
     p-> Err_Humidity= 0;
     p-> Err_XReady= 0;
-    p->Sen_GM_Cnt_Min=0;
-    p->Sen_Air_Q = 2;
-    p->Sen_Temp = 18.0f;
-    p->Sen_Humidity = 60.0f;
-    p->Sen_GM_Zivert = 0.13f;
+    extern uint16_t protons_on_min;
+    p->Sen_GM_Cnt_Min=protons_on_min;
+    extern uint8_t MP503_air;
+    p->Sen_Air_Q = MP503_air;
+    extern float ahtTemperature;
+    p->Sen_Temp = ahtTemperature;
+    extern float ahtHumidity;
+    p->Sen_Humidity = ahtHumidity;
+    p->Sen_GM_Zivert = (float)protons_on_min / 1000.0f; // TODO coeff not corrected
 }
 
+Serial_Num_Struct EEMEM sn_eem;
+Serial_Num_Struct   sn_my;
 
 void setup_radio() {
+    eeprom_read_block(&sn_my, &sn_eem, sizeof(Serial_Num_Struct));
+    if (sn_my.DevSerNum == 0 || sn_my.DevSerNum == __UINT32_MAX__) {
+        sn_my.DevSerNum = rand();
+        eeprom_write_block(&sn_my, &sn_eem, sizeof(Serial_Num_Struct));
+    }
+    Serial.print(F("My SN: "));
+    Serial.println(sn_my.DevSerNum, DEC);
+    
+    
     memset(&pkt, 0, sizeof(pkt));
     if (!radio.begin()) {
         Serial.println(F("RF24 is not responding!!"));
@@ -64,7 +85,7 @@ void do_radio() {
     if (pkt.Err_XReady == 0) {
         do_packet(&pkt);
         if (!radio.writeFast(&pkt, sizeof(Radio_Packet_Type))) {
-            Serial.println(F("writeFast fail!!"));
+            //Serial.println(F("writeFast fail!!"));
             radio.reUseTX();
         }
     }
